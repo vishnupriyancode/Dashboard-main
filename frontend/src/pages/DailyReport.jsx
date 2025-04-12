@@ -18,7 +18,10 @@ const DailyReport = () => {
   const [isFileUploaded, setIsFileUploaded] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState('');
   const [categories, setCategories] = useState([
-    { value: 'all', label: 'All Categories' }
+    { value: 'all', label: 'All Categories' },
+    { value: 'claims', label: 'Claims' },
+    { value: 'payments', label: 'Payments' },
+    { value: 'eligibility', label: 'Eligibility' },
   ]);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -60,6 +63,21 @@ const DailyReport = () => {
     });
   };
 
+  const calculateMetrics = (dataSet) => {
+    const totalRequests = dataSet.length;
+    const successfulRequests = dataSet.filter(item => item.status === 'success').length;
+    const failedRequests = totalRequests - successfulRequests;
+    const successRate = totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0;
+    const avgResponseTime = dataSet.reduce((acc, item) => acc + (item.responseTime || 0), 0) / totalRequests || 0;
+
+    return {
+      totalRequests,
+      successRate,
+      avgResponseTime,
+      failedRequests,
+    };
+  };
+
   const calculateComparison = (current, previous) => {
     if (!previous) return null;
     
@@ -72,53 +90,44 @@ const DailyReport = () => {
   };
 
   const handleFileUpload = (file) => {
-    setUploadedFileName(file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const workbook = XLSX.read(e.target.result, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        
-        const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0];
-        const newColumns = createColumnsFromHeaders(headers);
-        setColumns(newColumns);
-        
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
         
-        // Transform dates to consistent format and handle all data types
+        // Transform dates to consistent format and validate data
         const transformedData = jsonData.map((item, index) => {
-          const transformedItem = { key: index };
-          headers.forEach(header => {
-            const dataIndex = header.toLowerCase().replace(/\s+/g, '_');
-            if (header.toLowerCase().includes('date')) {
-              // Handle date conversion
-              transformedItem[dataIndex] = dayjs(item[header]).format('YYYY-MM-DD');
-            } else if (header.toLowerCase().includes('response') && header.toLowerCase().includes('time')) {
-              // Handle response time conversion
-              const rawValue = item[header];
-              let numericValue = 0;
-              if (typeof rawValue === 'string') {
-                numericValue = parseFloat(rawValue.replace(/[^\d.]/g, '')) || 0;
-              } else if (typeof rawValue === 'number') {
-                numericValue = rawValue;
-              }
-              transformedItem[dataIndex] = numericValue;
-            } else {
-              transformedItem[dataIndex] = item[header];
-            }
-          });
-          return transformedItem;
+          if (!item.date || !item.category || !item.status) {
+            throw new Error('Missing required fields in Excel file');
+          }
+
+          return {
+            key: index,
+            date: dayjs(item.date).format('YYYY-MM-DD'),
+            category: item.category,
+            status: item.status,
+            responseTime: parseFloat(item.responseTime) || 0,
+          };
         });
+
+        // Create columns from headers
+        const headers = Object.keys(jsonData[0]);
+        setColumns(createColumnsFromHeaders(headers));
         
         setData(transformedData);
         setFilteredData(transformedData);
         setIsFileUploaded(true);
+        setUploadedFileName(file.name);
         message.success('File uploaded successfully');
       } catch (error) {
-        console.error('Error processing file:', error);
-        message.error('Error processing file. Please check the file format and try again.');
+        message.error(`Error processing file: ${error.message}`);
       }
+    };
+    reader.onerror = () => {
+      message.error('Error reading file');
     };
     reader.readAsArrayBuffer(file);
     return false;
@@ -127,18 +136,12 @@ const DailyReport = () => {
   const handleRemoveFile = () => {
     setData([]);
     setFilteredData([]);
+    setColumns([]);
     setIsFileUploaded(false);
     setUploadedFileName('');
-    setCategories([{ value: 'all', label: 'All Categories' }]);
-    setSelectedCategory('all');
     setDateRange([null, null]);
     setTempDateRange([null, null]);
-    setPreviousMetrics(null);
-    setPagination({
-      current: 1,
-      pageSize: 10,
-      total: 0,
-    });
+    setSelectedCategory('all');
     message.success('File removed successfully');
   };
 
@@ -167,37 +170,15 @@ const DailyReport = () => {
       
       // Apply date filtering with proper date parsing and validation
       filtered = filtered.filter(item => {
-        // Skip items without date
-        if (!item || !item.date) {
-          return false;
-        }
+        if (!item || !item.date) return false;
         
-        // Ensure proper date parsing
-        let itemDate;
-        try {
-          itemDate = dayjs(item.date);
-          if (!itemDate.isValid()) {
-            return false;
-          }
-        } catch (err) {
-          console.warn('Invalid date format:', item.date);
-          return false;
-        }
+        const itemDate = dayjs(item.date);
+        if (!itemDate.isValid()) return false;
 
         const start = dayjs(startDate).startOf('day');
         const end = dayjs(endDate).endOf('day');
 
-        // Ensure all dates are valid before comparison
-        if (!start.isValid() || !end.isValid()) {
-          return false;
-        }
-
-        // Compare dates using unix timestamps for more reliable comparison
-        const itemTimestamp = itemDate.startOf('day').unix();
-        const startTimestamp = start.unix();
-        const endTimestamp = end.unix();
-
-        return itemTimestamp >= startTimestamp && itemTimestamp <= endTimestamp;
+        return itemDate.unix() >= start.unix() && itemDate.unix() <= end.unix();
       });
 
       // Apply category filtering if needed
@@ -206,11 +187,6 @@ const DailyReport = () => {
           if (!item || !item.category) return false;
           return item.category.toLowerCase() === selectedCategory.toLowerCase();
         });
-      }
-
-      // Validate filtered results
-      if (!Array.isArray(filtered)) {
-        throw new Error('Filtering operation returned invalid results');
       }
 
       // Update states
@@ -223,7 +199,7 @@ const DailyReport = () => {
         pageSize: 10
       }));
 
-      // Calculate previous period metrics only if we have valid filtered data
+      // Calculate previous period metrics
       if (filtered.length > 0) {
         const daysDiff = dayjs(endDate).diff(dayjs(startDate), 'day');
         const previousStartDate = dayjs(startDate).subtract(daysDiff + 1, 'day');
@@ -250,104 +226,20 @@ const DailyReport = () => {
       }
 
     } catch (error) {
-      console.error('Filtering error details:', {
-        error: error.message,
-        dataLength: data?.length,
-        dateRange: tempDateRange,
-        category: selectedCategory
-      });
-      
-      message.error('Error occurred while filtering data. Please check the date format and try again.');
-      
-      // Reset to initial state on error
-      setFilteredData(data);
-      setPagination(prev => ({
-        ...prev,
-        total: data.length,
-        current: 1
-      }));
+      console.error('Filtering error:', error);
+      message.error('Error applying filters');
     }
   };
 
-  useEffect(() => {
-    if (data.length > 0) {
-      setFilteredData(data);
-      setPagination(prev => ({ ...prev, total: data.length, current: 1 }));
-    }
-  }, [data]);
-
-  const calculateMetrics = (data) => {
-    if (!data || data.length === 0) {
-      return {
-        totalRequests: 0,
-        successRate: 0,
-        avgResponseTime: 0,
-        failedRequests: 0
-      };
-    }
-
-    const totalRequests = data.length;
-    
-    // Find response time column in the first data item
-    const responseTimeKey = Object.keys(data[0]).find(key => 
-      key.includes('response_time') || key.includes('responsetime')
-    );
-    
-    // Calculate average response time
-    const totalResponseTime = data.reduce((sum, item) => {
-      const responseTime = parseFloat(item[responseTimeKey]) || 0;
-      return sum + responseTime;
-    }, 0);
-    
-    const avgResponseTime = totalResponseTime / totalRequests;
-
-    // Calculate success rate
-    const successfulRequests = data.filter(item => {
-      const status = (item.status || '').toLowerCase();
-      return status === 'success' || status === '200' || status === 'ok';
-    }).length;
-    
-    const failedRequests = totalRequests - successfulRequests;
-    const successRate = (successfulRequests / totalRequests) * 100;
-
-    return {
-      totalRequests,
-      successRate,
-      avgResponseTime,
-      failedRequests
-    };
+  const handleTableChange = (newPagination, filters, sorter) => {
+    setPagination(prev => ({
+      ...prev,
+      ...newPagination
+    }));
   };
 
-  const handleTableChange = (pagination, filters, sorter) => {
-    setPagination(pagination);
-  };
-
-  const renderTable = () => {
-    if (!isFileUploaded) {
-      return null;
-    }
-
-    return (
-      <div className="table-container" style={{ marginTop: '20px' }}>
-        <Table
-          columns={columns}
-          dataSource={filteredData}
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: true }}
-          size="middle"
-          bordered
-          locale={{
-            emptyText: 'No data found for the selected date range'
-          }}
-        />
-      </div>
-    );
-  };
+  const currentMetrics = calculateMetrics(filteredData);
+  const comparison = calculateComparison(currentMetrics, previousMetrics);
 
   const renderComparisonValue = (value, inverse = false) => {
     if (!value && value !== 0) return null;
@@ -374,147 +266,143 @@ const DailyReport = () => {
 
   return (
     <div className="daily-report-container">
-      <Card className="daily-report-card">
+      <Card title="Daily Report" className="daily-report-card">
         <div className="controls-section">
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            width: '100%', 
-            justifyContent: 'space-between' 
-          }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Upload
-                beforeUpload={handleFileUpload}
-                accept=".xlsx,.xls"
-                showUploadList={false}
-                maxCount={1}
-              >
-                <Button 
-                  icon={isFileUploaded ? <CheckCircleOutlined style={{ color: '#000000' }} /> : <UploadOutlined />}
-                  disabled={isFileUploaded}
-                  style={{
-                    background: isFileUploaded ? 'linear-gradient(to right, #52c41a, #ffffff)' : 'linear-gradient(to right, #52c41a, #ffffff)',
-                    color: '#000000',
-                    borderColor: '#52c41a',
-                    minWidth: '160px',
-                    maxWidth: '300px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}
-                  title={isFileUploaded ? uploadedFileName : 'Upload Excel File'}
-                >
-                  {isFileUploaded ? uploadedFileName : 'Upload Excel File'}
-                </Button>
-              </Upload>
-              {isFileUploaded && (
-                <Button 
-                  icon={<DeleteOutlined />} 
-                  onClick={handleRemoveFile}
-                  style={{
-                    background: 'linear-gradient(to right, #ffa39e, #ffffff)',
-                    borderColor: '#ffa39e',
-                    color: '#000000',
-                    minWidth: '140px'
-                  }}
-                >
-                  Remove File
-                </Button>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <Select
-                className="select-bold"
-                style={{ 
-                  width: '280px',
-                  background: 'linear-gradient(to right, #f0f0f0, #ffffff)'
-                }}
-                value={selectedCategory}
-                onChange={(value) => {
-                  setSelectedCategory(value);
-                  handleApplyFilters();
-                }}
-                options={categories}
-                placeholder="Select Category"
-              />
-              <RangePicker
-                className="date-picker-bold"
-                value={tempDateRange}
-                onChange={(dates) => {
-                  setTempDateRange(dates);
-                }}
-                format="YYYY-MM-DD"
-                style={{ 
-                  width: '340px',
-                  background: 'linear-gradient(to right, #f0f0f0, #ffffff)'
-                }}
-                placeholder={['Start Date', 'End Date']}
-              />
-              <Button 
-                type="primary"
-                onClick={handleApplyFilters}
+          <div className="upload-section">
+            <Upload
+              beforeUpload={handleFileUpload}
+              accept=".xlsx,.xls"
+              showUploadList={false}
+            >
+              <Button
+                icon={isFileUploaded ? <CheckCircleOutlined /> : <UploadOutlined />}
                 style={{
-                  background: 'linear-gradient(to right, #f0f0f0, #ffffff)',
-                  borderColor: '#d9d9d9',
+                  background: isFileUploaded 
+                    ? 'linear-gradient(to right, #52c41a, #ffffff)'
+                    : 'linear-gradient(to right, #1890ff, #ffffff)',
+                  borderColor: isFileUploaded ? '#52c41a' : '#1890ff',
                   color: '#000000',
-                  minWidth: '120px',
-                  fontWeight: '500',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                  minWidth: '140px'
                 }}
-                disabled={!tempDateRange || !tempDateRange[0] || !tempDateRange[1]}
+                title={isFileUploaded ? uploadedFileName : 'Upload Excel File'}
               >
-                Apply Filters
+                {isFileUploaded ? uploadedFileName : 'Upload Excel File'}
               </Button>
-            </div>
+            </Upload>
+            {isFileUploaded && (
+              <Button 
+                icon={<DeleteOutlined />} 
+                onClick={handleRemoveFile}
+                style={{
+                  background: 'linear-gradient(to right, #ffa39e, #ffffff)',
+                  borderColor: '#ffa39e',
+                  color: '#000000',
+                  minWidth: '140px'
+                }}
+              >
+                Remove File
+              </Button>
+            )}
+          </div>
+          <div className="filters-section">
+            <Select
+              className="select-bold"
+              style={{ 
+                width: '280px',
+                background: 'linear-gradient(to right, #f0f0f0, #ffffff)'
+              }}
+              value={selectedCategory}
+              onChange={(value) => {
+                setSelectedCategory(value);
+                handleApplyFilters();
+              }}
+              options={categories}
+              placeholder="Select Category"
+            />
+            <RangePicker
+              className="date-picker-bold"
+              value={tempDateRange}
+              onChange={(dates) => {
+                setTempDateRange(dates);
+              }}
+              format="YYYY-MM-DD"
+              style={{ 
+                width: '340px',
+                background: 'linear-gradient(to right, #f0f0f0, #ffffff)'
+              }}
+            />
+            <Button
+              type="primary"
+              onClick={handleApplyFilters}
+              style={{
+                background: 'linear-gradient(to right, #1890ff, #096dd9)',
+                borderColor: '#1890ff'
+              }}
+            >
+              Apply Filters
+            </Button>
           </div>
         </div>
 
-        <Row gutter={[16, 16]} style={{ marginTop: '24px' }}>
+        <Row gutter={16} className="mb-6">
           <Col span={6}>
-            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #f0f0f0, #ffffff)' }}>
+            <Card className="metrics-card" bodyStyle={{ position: 'relative', paddingBottom: '32px' }}>
               <Statistic
-                title="Total Records"
-                value={isFileUploaded ? filteredData.length : 0}
-                valueStyle={{ color: '#000000' }}
+                title="Total Requests"
+                value={currentMetrics.totalRequests}
+                precision={0}
               />
-              {previousMetrics && renderComparisonValue(calculateComparison(calculateMetrics(filteredData), previousMetrics).totalRequests)}
+              {comparison && renderComparisonValue(comparison.totalRequests)}
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #f0f0f0, #ffffff)' }}>
+            <Card className="metrics-card" bodyStyle={{ position: 'relative', paddingBottom: '32px' }}>
               <Statistic
                 title="Success Rate"
-                value={isFileUploaded ? calculateMetrics(filteredData).successRate.toFixed(2) : "0.00"}
+                value={currentMetrics.successRate}
+                precision={2}
                 suffix="%"
-                valueStyle={{ color: '#000000' }}
               />
-              {previousMetrics && renderComparisonValue(calculateComparison(calculateMetrics(filteredData), previousMetrics).successRate)}
+              {comparison && renderComparisonValue(comparison.successRate)}
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #f0f0f0, #ffffff)' }}>
+            <Card className="metrics-card" bodyStyle={{ position: 'relative', paddingBottom: '32px' }}>
               <Statistic
-                title="Avg Response Time"
-                value={isFileUploaded ? calculateMetrics(filteredData).avgResponseTime.toFixed(2) : "0.00"}
+                title="Average Response Time"
+                value={currentMetrics.avgResponseTime}
+                precision={2}
                 suffix="ms"
-                valueStyle={{ color: '#000000' }}
               />
-              {previousMetrics && renderComparisonValue(calculateComparison(calculateMetrics(filteredData), previousMetrics).avgResponseTime, true)}
+              {comparison && renderComparisonValue(comparison.avgResponseTime, true)}
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #f0f0f0, #ffffff)' }}>
+            <Card className="metrics-card" bodyStyle={{ position: 'relative', paddingBottom: '32px' }}>
               <Statistic
                 title="Failed Requests"
-                value={isFileUploaded ? calculateMetrics(filteredData).failedRequests : 0}
-                valueStyle={{ color: '#000000' }}
+                value={currentMetrics.failedRequests}
+                precision={0}
               />
-              {previousMetrics && renderComparisonValue(calculateComparison(calculateMetrics(filteredData), previousMetrics).failedRequests, true)}
+              {comparison && renderComparisonValue(comparison.failedRequests, true)}
             </Card>
           </Col>
         </Row>
 
-        {renderTable()}
+        <div className="table-container">
+          <Table
+            columns={columns}
+            dataSource={filteredData}
+            pagination={{
+              ...pagination,
+              showSizeChanger: true,
+              showTotal: (total) => `Total ${total} items`,
+              pageSizeOptions: ['10', '20', '50', '100']
+            }}
+            onChange={handleTableChange}
+            scroll={{ x: true }}
+          />
+        </div>
       </Card>
     </div>
   );
