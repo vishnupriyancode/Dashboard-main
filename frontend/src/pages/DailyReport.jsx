@@ -459,8 +459,8 @@ const DailyReport = () => {
               <Button
                 icon={isFileUploaded ? <CheckCircleOutlined /> : <UploadOutlined />}
                 style={{
-                  background: isFileUploaded ? 'linear-gradient(to right, #52c41a, #ffffff)' : 'linear-gradient(to right, #1890ff, #ffffff)',
-                  color: isFileUploaded ? '#135200' : '#003a8c',
+                  background: isFileUploaded ? 'linear-gradient(to right, #52c41a, #ffffff)' : 'linear-gradient(to right, #808080, #ffffff)',
+                  color: isFileUploaded ? '#135200' : '#333333',
                   minWidth: '160px',
                   display: 'flex',
                   alignItems: 'center',
