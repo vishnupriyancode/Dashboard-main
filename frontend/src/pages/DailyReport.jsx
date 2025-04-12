@@ -21,12 +21,18 @@ const DailyReport = () => {
     { value: 'all', label: 'All Categories' },
     { value: 'claims', label: 'Claims' },
     { value: 'payments', label: 'Payments' },
-    { value: 'eligibility', label: 'Eligibility' },
+    { value: 'eligibility', label: 'Eligibility' }
   ]);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
     total: 0,
+  });
+  const [headerMapping, setHeaderMapping] = useState({
+    date: ['date', 'datetime', 'time', 'day'],
+    category: ['category', 'type', 'categories', 'group'],
+    status: ['status', 'state', 'condition', 'result'],
+    responseTime: ['responsetime', 'response', 'response_time', 'responseduration', 'duration', 'time']
   });
 
   const createColumnsFromHeaders = (headers) => {
@@ -64,11 +70,18 @@ const DailyReport = () => {
   };
 
   const calculateMetrics = (dataSet) => {
+    if (!Array.isArray(dataSet) || dataSet.length === 0) return {
+      totalRequests: 0,
+      successRate: 0,
+      avgResponseTime: 0,
+      failedRequests: 0,
+    };
+
     const totalRequests = dataSet.length;
     const successfulRequests = dataSet.filter(item => item.status === 'success').length;
     const failedRequests = totalRequests - successfulRequests;
     const successRate = totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 0;
-    const avgResponseTime = dataSet.reduce((acc, item) => acc + (item.responseTime || 0), 0) / totalRequests || 0;
+    const avgResponseTime = dataSet.reduce((acc, item) => acc + (parseFloat(item.responseTime) || 0), 0) / totalRequests || 0;
 
     return {
       totalRequests,
@@ -87,62 +100,6 @@ const DailyReport = () => {
       avgResponseTime: ((current.avgResponseTime - previous.avgResponseTime) / previous.avgResponseTime * 100) || 0,
       failedRequests: ((current.failedRequests - previous.failedRequests) / previous.failedRequests * 100) || 0,
     };
-  };
-
-  const handleFileUpload = (file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const workbook = XLSX.read(e.target.result, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        
-        // Transform dates to consistent format and validate data
-        const transformedData = jsonData.map((item, index) => {
-          if (!item.date || !item.category || !item.status) {
-            throw new Error('Missing required fields in Excel file');
-          }
-
-          return {
-            key: index,
-            date: dayjs(item.date).format('YYYY-MM-DD'),
-            category: item.category,
-            status: item.status,
-            responseTime: parseFloat(item.responseTime) || 0,
-          };
-        });
-
-        // Create columns from headers
-        const headers = Object.keys(jsonData[0]);
-        setColumns(createColumnsFromHeaders(headers));
-        
-        setData(transformedData);
-        setFilteredData(transformedData);
-        setIsFileUploaded(true);
-        setUploadedFileName(file.name);
-        message.success('File uploaded successfully');
-      } catch (error) {
-        message.error(`Error processing file: ${error.message}`);
-      }
-    };
-    reader.onerror = () => {
-      message.error('Error reading file');
-    };
-    reader.readAsArrayBuffer(file);
-    return false;
-  };
-
-  const handleRemoveFile = () => {
-    setData([]);
-    setFilteredData([]);
-    setColumns([]);
-    setIsFileUploaded(false);
-    setUploadedFileName('');
-    setDateRange([null, null]);
-    setTempDateRange([null, null]);
-    setSelectedCategory('all');
-    message.success('File removed successfully');
   };
 
   const handleApplyFilters = () => {
@@ -172,13 +129,25 @@ const DailyReport = () => {
       filtered = filtered.filter(item => {
         if (!item || !item.date) return false;
         
-        const itemDate = dayjs(item.date);
-        if (!itemDate.isValid()) return false;
+        let itemDate;
+        try {
+          itemDate = dayjs(item.date);
+          if (!itemDate.isValid()) return false;
+        } catch (err) {
+          console.warn('Invalid date format:', item.date);
+          return false;
+        }
 
         const start = dayjs(startDate).startOf('day');
         const end = dayjs(endDate).endOf('day');
 
-        return itemDate.unix() >= start.unix() && itemDate.unix() <= end.unix();
+        if (!start.isValid() || !end.isValid()) return false;
+
+        const itemTimestamp = itemDate.startOf('day').unix();
+        const startTimestamp = start.unix();
+        const endTimestamp = end.unix();
+
+        return itemTimestamp >= startTimestamp && itemTimestamp <= endTimestamp;
       });
 
       // Apply category filtering if needed
@@ -189,7 +158,10 @@ const DailyReport = () => {
         });
       }
 
-      // Update states
+      if (!Array.isArray(filtered)) {
+        throw new Error('Filtering operation returned invalid results');
+      }
+
       setDateRange(tempDateRange);
       setFilteredData(filtered);
       setPagination(prev => ({
@@ -218,7 +190,6 @@ const DailyReport = () => {
         setPreviousMetrics(calculateMetrics(previousPeriodData));
       }
 
-      // Show appropriate message based on results
       if (filtered.length === 0) {
         message.info(`No records found between ${dayjs(startDate).format('YYYY-MM-DD')} and ${dayjs(endDate).format('YYYY-MM-DD')}`);
       } else {
@@ -227,8 +198,146 @@ const DailyReport = () => {
 
     } catch (error) {
       console.error('Filtering error:', error);
-      message.error('Error applying filters');
+      message.error('An error occurred while filtering data');
     }
+  };
+
+  const findMatchingHeader = (headers, mappings) => {
+    return headers.find(header => 
+      mappings.some(mapping => header.toLowerCase().replace(/[^a-z0-9]/g, '') === mapping.toLowerCase())
+    );
+  };
+
+  const handleFileUpload = (file) => {
+    // Validate file type
+    const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                    file.type === 'application/vnd.ms-excel';
+    if (!isExcel) {
+      message.error('You can only upload Excel files (.xlsx or .xls)');
+      return false;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const workbook = XLSX.read(e.target.result, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        if (!Array.isArray(rawData) || rawData.length < 2) {
+          message.error('No data found in the Excel file. Please ensure the file has headers and data.');
+          return;
+        }
+
+        // Get headers from first row and clean them
+        const headers = rawData[0].map(header => 
+          header ? header.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ''
+        );
+
+        // Find matching headers for required fields
+        const dateHeader = findMatchingHeader(headers, headerMapping.date);
+        const categoryHeader = findMatchingHeader(headers, headerMapping.category);
+        const statusHeader = findMatchingHeader(headers, headerMapping.status);
+        const responseTimeHeader = findMatchingHeader(headers, headerMapping.responseTime);
+
+        // Map the original headers to our expected format
+        const headerIndexMap = {
+          date: headers.indexOf(dateHeader),
+          category: headers.indexOf(categoryHeader),
+          status: headers.indexOf(statusHeader),
+          responseTime: headers.indexOf(responseTimeHeader)
+        };
+
+        // Check if all required fields are found
+        const missingFields = [];
+        Object.entries(headerIndexMap).forEach(([field, index]) => {
+          if (index === -1) missingFields.push(field);
+        });
+
+        if (missingFields.length > 0) {
+          message.error(
+            `Could not find columns for: ${missingFields.join(', ')}.\n` +
+            'Acceptable header names include:\n' +
+            `Date: ${headerMapping.date.join(', ')}\n` +
+            `Category: ${headerMapping.category.join(', ')}\n` +
+            `Status: ${headerMapping.status.join(', ')}\n` +
+            `Response Time: ${headerMapping.responseTime.join(', ')}`
+          );
+          return;
+        }
+
+        // Transform data using the mapped headers
+        const transformedData = rawData.slice(1).map((row, index) => {
+          const date = row[headerIndexMap.date];
+          const category = row[headerIndexMap.category];
+          const status = row[headerIndexMap.status];
+          const responseTime = row[headerIndexMap.responseTime];
+
+          // Validate date
+          const parsedDate = dayjs(date);
+          if (!parsedDate.isValid()) {
+            throw new Error(`Invalid date format in row ${index + 2}. Expected format: YYYY-MM-DD`);
+          }
+
+          // Validate category
+          const validCategories = categories.map(c => c.value.toLowerCase());
+          if (!category || !validCategories.includes(category.toString().toLowerCase())) {
+            throw new Error(`Invalid category "${category}" in row ${index + 2}. Valid categories are: ${validCategories.slice(1).join(', ')}`);
+          }
+
+          // Validate status
+          const validStatuses = ['success', 'failed'];
+          if (!status || !validStatuses.includes(status.toString().toLowerCase())) {
+            throw new Error(`Invalid status "${status}" in row ${index + 2}. Status must be either "success" or "failed"`);
+          }
+
+          return {
+            key: index,
+            date: parsedDate.format('YYYY-MM-DD'),
+            category: category.toString().toLowerCase(),
+            status: status.toString().toLowerCase(),
+            responseTime: parseFloat(responseTime) || 0
+          };
+        });
+
+        setData(transformedData);
+        setFilteredData(transformedData);
+        setIsFileUploaded(true);
+        setUploadedFileName(file.name);
+        message.success(`Successfully uploaded ${transformedData.length} records from ${file.name}`);
+
+      } catch (error) {
+        console.error('File processing error:', error);
+        message.error(
+          'Error processing file: ' + error.message + '\n\n' +
+          'Your Excel file should contain columns for:\n' +
+          '- Date (any date format)\n' +
+          '- Category (claims, payments, or eligibility)\n' +
+          '- Status (success or failed)\n' +
+          '- Response Time (number in milliseconds)\n\n' +
+          'The column names can be flexible, but the data must match these formats.'
+        );
+      }
+    };
+
+    reader.onerror = () => {
+      message.error('Error reading file. Please try again or use a different file.');
+    };
+
+    reader.readAsArrayBuffer(file);
+    return false;
+  };
+
+  const handleRemoveFile = () => {
+    setData([]);
+    setFilteredData([]);
+    setIsFileUploaded(false);
+    setUploadedFileName('');
+    setDateRange([null, null]);
+    setTempDateRange([null, null]);
+    setPreviousMetrics(null);
+    message.success('File removed successfully');
   };
 
   const handleTableChange = (newPagination, filters, sorter) => {
@@ -273,20 +382,21 @@ const DailyReport = () => {
               beforeUpload={handleFileUpload}
               accept=".xlsx,.xls"
               showUploadList={false}
+              maxCount={1}
             >
               <Button
                 icon={isFileUploaded ? <CheckCircleOutlined /> : <UploadOutlined />}
                 style={{
-                  background: isFileUploaded 
-                    ? 'linear-gradient(to right, #52c41a, #ffffff)'
-                    : 'linear-gradient(to right, #1890ff, #ffffff)',
-                  borderColor: isFileUploaded ? '#52c41a' : '#1890ff',
-                  color: '#000000',
-                  minWidth: '140px'
+                  background: isFileUploaded ? 'linear-gradient(to right, #52c41a, #ffffff)' : 'linear-gradient(to right, #1890ff, #ffffff)',
+                  color: isFileUploaded ? '#135200' : '#003a8c',
+                  minWidth: '160px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
-                title={isFileUploaded ? uploadedFileName : 'Upload Excel File'}
               >
-                {isFileUploaded ? uploadedFileName : 'Upload Excel File'}
+                {isFileUploaded ? 'File Uploaded' : 'Upload Excel File'}
               </Button>
             </Upload>
             {isFileUploaded && (
@@ -294,10 +404,13 @@ const DailyReport = () => {
                 icon={<DeleteOutlined />} 
                 onClick={handleRemoveFile}
                 style={{
-                  background: 'linear-gradient(to right, #ffa39e, #ffffff)',
-                  borderColor: '#ffa39e',
-                  color: '#000000',
-                  minWidth: '140px'
+                  background: 'linear-gradient(to right, #ff4d4f, #ffffff)',
+                  color: '#a8071a',
+                  minWidth: '140px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
               >
                 Remove File
@@ -335,8 +448,10 @@ const DailyReport = () => {
               type="primary"
               onClick={handleApplyFilters}
               style={{
-                background: 'linear-gradient(to right, #1890ff, #096dd9)',
-                borderColor: '#1890ff'
+                background: 'linear-gradient(to right, #f0f0f0, #ffffff)',
+                color: '#000000',
+                minWidth: '120px',
+                border: '1px solid #d9d9d9'
               }}
             >
               Apply Filters
@@ -346,7 +461,7 @@ const DailyReport = () => {
 
         <Row gutter={16} className="mb-6">
           <Col span={6}>
-            <Card className="metrics-card" bodyStyle={{ position: 'relative', paddingBottom: '32px' }}>
+            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #e0e0e0, #ffffff)' }}>
               <Statistic
                 title="Total Requests"
                 value={currentMetrics.totalRequests}
@@ -356,7 +471,7 @@ const DailyReport = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="metrics-card" bodyStyle={{ position: 'relative', paddingBottom: '32px' }}>
+            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #e0e0e0, #ffffff)' }}>
               <Statistic
                 title="Success Rate"
                 value={currentMetrics.successRate}
@@ -367,9 +482,9 @@ const DailyReport = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="metrics-card" bodyStyle={{ position: 'relative', paddingBottom: '32px' }}>
+            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #e0e0e0, #ffffff)' }}>
               <Statistic
-                title="Average Response Time"
+                title="Avg Response Time"
                 value={currentMetrics.avgResponseTime}
                 precision={2}
                 suffix="ms"
@@ -378,7 +493,7 @@ const DailyReport = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="metrics-card" bodyStyle={{ position: 'relative', paddingBottom: '32px' }}>
+            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #e0e0e0, #ffffff)' }}>
               <Statistic
                 title="Failed Requests"
                 value={currentMetrics.failedRequests}
@@ -391,7 +506,37 @@ const DailyReport = () => {
 
         <div className="table-container">
           <Table
-            columns={columns}
+            columns={[
+              {
+                title: 'Date',
+                dataIndex: 'date',
+                key: 'date',
+                sorter: (a, b) => new Date(a.date) - new Date(b.date),
+              },
+              {
+                title: 'Category',
+                dataIndex: 'category',
+                key: 'category',
+                filters: categories.slice(1).map(cat => ({ text: cat.label, value: cat.value })),
+                onFilter: (value, record) => record.category === value,
+              },
+              {
+                title: 'Status',
+                dataIndex: 'status',
+                key: 'status',
+                filters: [
+                  { text: 'Success', value: 'success' },
+                  { text: 'Failed', value: 'failed' },
+                ],
+                onFilter: (value, record) => record.status === value,
+              },
+              {
+                title: 'Response Time (ms)',
+                dataIndex: 'responseTime',
+                key: 'responseTime',
+                sorter: (a, b) => a.responseTime - b.responseTime,
+              }
+            ]}
             dataSource={filteredData}
             pagination={{
               ...pagination,

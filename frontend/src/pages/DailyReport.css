@@ -13,12 +13,36 @@
 
 .controls-section {
   margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .upload-section {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
+  flex-shrink: 0;
+}
+
+.upload-section .ant-upload-select {
+  display: inline-block;
+}
+
+.upload-section .ant-btn {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.upload-section .ant-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
 }
 
 .filters-section {
