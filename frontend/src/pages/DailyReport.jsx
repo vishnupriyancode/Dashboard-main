@@ -60,6 +60,17 @@ const DailyReport = () => {
     });
   };
 
+  const calculateComparison = (current, previous) => {
+    if (!previous) return null;
+    
+    return {
+      totalRequests: ((current.totalRequests - previous.totalRequests) / previous.totalRequests * 100) || 0,
+      successRate: current.successRate - previous.successRate,
+      avgResponseTime: ((current.avgResponseTime - previous.avgResponseTime) / previous.avgResponseTime * 100) || 0,
+      failedRequests: ((current.failedRequests - previous.failedRequests) / previous.failedRequests * 100) || 0,
+    };
+  };
+
   const handleFileUpload = (file) => {
     setUploadedFileName(file.name);
     const reader = new FileReader();
@@ -75,21 +86,19 @@ const DailyReport = () => {
         
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
         
-        // Find the response time column
-        const responseTimeColumn = headers.find(h => 
-          h.toLowerCase().includes('response') && h.toLowerCase().includes('time')
-        );
-        
+        // Transform dates to consistent format and handle all data types
         const transformedData = jsonData.map((item, index) => {
           const transformedItem = { key: index };
           headers.forEach(header => {
             const dataIndex = header.toLowerCase().replace(/\s+/g, '_');
-            // Convert response time to number and handle any unit conversions
-            if (header === responseTimeColumn) {
+            if (header.toLowerCase().includes('date')) {
+              // Handle date conversion
+              transformedItem[dataIndex] = dayjs(item[header]).format('YYYY-MM-DD');
+            } else if (header.toLowerCase().includes('response') && header.toLowerCase().includes('time')) {
+              // Handle response time conversion
               const rawValue = item[header];
               let numericValue = 0;
               if (typeof rawValue === 'string') {
-                // Remove any non-numeric characters except decimal point
                 numericValue = parseFloat(rawValue.replace(/[^\d.]/g, '')) || 0;
               } else if (typeof rawValue === 'number') {
                 numericValue = rawValue;
@@ -102,27 +111,13 @@ const DailyReport = () => {
           return transformedItem;
         });
         
-        // Handle categories
-        const categoryColumn = headers.find(h => h.toLowerCase().includes('category'));
-        if (categoryColumn) {
-          const uniqueCategories = [...new Set(jsonData.map(item => item[categoryColumn]))];
-          const newCategories = [
-            { value: 'all', label: 'All Categories' },
-            ...uniqueCategories.map(category => ({
-              value: category.toLowerCase(),
-              label: category
-            }))
-          ];
-          setCategories(newCategories);
-        }
-        
         setData(transformedData);
         setFilteredData(transformedData);
         setIsFileUploaded(true);
         message.success('File uploaded successfully');
       } catch (error) {
-        message.error('Error processing file');
-        console.error('File processing error:', error);
+        console.error('Error processing file:', error);
+        message.error('Error processing file. Please check the file format and try again.');
       }
     };
     reader.readAsArrayBuffer(file);
@@ -354,6 +349,29 @@ const DailyReport = () => {
     );
   };
 
+  const renderComparisonValue = (value, inverse = false) => {
+    if (!value && value !== 0) return null;
+    const isPositive = inverse ? value <= 0 : value >= 0;
+    const color = isPositive ? '#3f8600' : '#cf1322';
+    const prefix = value >= 0 ? '+' : '';
+    
+    return (
+      <div style={{ 
+        position: 'absolute',
+        bottom: '8px',
+        right: '24px',
+        fontSize: '14px',
+        color: color,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px'
+      }}>
+        {isPositive ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+        {prefix}{Math.abs(value).toFixed(1)}%
+      </div>
+    );
+  };
+
   return (
     <div className="daily-report-container">
       <Card className="daily-report-card">
@@ -414,7 +432,7 @@ const DailyReport = () => {
                 value={selectedCategory}
                 onChange={(value) => {
                   setSelectedCategory(value);
-                  handleApplyFilters(); // Reapply filters when category changes
+                  handleApplyFilters();
                 }}
                 options={categories}
                 placeholder="Select Category"
@@ -459,6 +477,7 @@ const DailyReport = () => {
                 value={isFileUploaded ? filteredData.length : 0}
                 valueStyle={{ color: '#000000' }}
               />
+              {previousMetrics && renderComparisonValue(calculateComparison(calculateMetrics(filteredData), previousMetrics).totalRequests)}
             </Card>
           </Col>
           <Col span={6}>
@@ -469,6 +488,7 @@ const DailyReport = () => {
                 suffix="%"
                 valueStyle={{ color: '#000000' }}
               />
+              {previousMetrics && renderComparisonValue(calculateComparison(calculateMetrics(filteredData), previousMetrics).successRate)}
             </Card>
           </Col>
           <Col span={6}>
@@ -479,6 +499,7 @@ const DailyReport = () => {
                 suffix="ms"
                 valueStyle={{ color: '#000000' }}
               />
+              {previousMetrics && renderComparisonValue(calculateComparison(calculateMetrics(filteredData), previousMetrics).avgResponseTime, true)}
             </Card>
           </Col>
           <Col span={6}>
@@ -488,6 +509,7 @@ const DailyReport = () => {
                 value={isFileUploaded ? calculateMetrics(filteredData).failedRequests : 0}
                 valueStyle={{ color: '#000000' }}
               />
+              {previousMetrics && renderComparisonValue(calculateComparison(calculateMetrics(filteredData), previousMetrics).failedRequests, true)}
             </Card>
           </Col>
         </Row>
