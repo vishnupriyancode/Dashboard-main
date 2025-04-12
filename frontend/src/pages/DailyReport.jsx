@@ -21,7 +21,8 @@ const DailyReport = () => {
     { value: 'all', label: 'All Categories' },
     { value: 'claims', label: 'Claims' },
     { value: 'payments', label: 'Payments' },
-    { value: 'eligibility', label: 'Eligibility' }
+    { value: 'eligibility', label: 'Eligibility' },
+    { value: 'non_eligibility', label: 'Non-Eligibility' }
   ]);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -208,8 +209,58 @@ const DailyReport = () => {
     );
   };
 
+  const validateAndFormatCategory = (category) => {
+    if (!category) return null;
+    
+    const formattedCategory = category.toString().toLowerCase().trim();
+    const validBaseCategories = ['claims', 'payments', 'eligibility', 'non_eligibility'];
+    
+    if (validBaseCategories.includes(formattedCategory)) {
+      return formattedCategory;
+    }
+
+    // Try to normalize the category name
+    const normalizedCategory = formattedCategory
+      .replace(/[^a-z0-9_]/g, '_')  // Replace any non-alphanumeric chars with underscore
+      .replace(/^non[\s_-]*eligibility$/, 'non_eligibility'); // Normalize variations of non-eligibility
+    
+    if (validBaseCategories.includes(normalizedCategory)) {
+      return normalizedCategory;
+    }
+    
+    return null;
+  };
+
+  const updateCategoriesList = (newData) => {
+    const uniqueCategories = new Set();
+    
+    // Add existing categories
+    categories.forEach(cat => {
+      if (cat.value !== 'all') {
+        uniqueCategories.add(cat.value);
+      }
+    });
+
+    // Add new categories from data
+    newData.forEach(row => {
+      if (row.category) {
+        uniqueCategories.add(row.category.toLowerCase());
+      }
+    });
+
+    // Convert to categories array format
+    const updatedCategories = [
+      { value: 'all', label: 'All Categories' },
+      ...Array.from(uniqueCategories).map(cat => ({
+        value: cat,
+        label: cat.charAt(0).toUpperCase() + cat.slice(1)
+      }))
+    ];
+
+    setCategories(updatedCategories);
+  };
+
   const handleFileUpload = (file) => {
-    // Validate file type
     const isExcel = file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
                     file.type === 'application/vnd.ms-excel';
     if (!isExcel) {
@@ -268,7 +319,10 @@ const DailyReport = () => {
         }
 
         // Transform data using the mapped headers
-        const transformedData = rawData.slice(1).map((row, index) => {
+        const transformedData = [];
+        const invalidRows = [];
+
+        rawData.slice(1).forEach((row, index) => {
           const date = row[headerIndexMap.date];
           const category = row[headerIndexMap.category];
           const status = row[headerIndexMap.status];
@@ -277,35 +331,53 @@ const DailyReport = () => {
           // Validate date
           const parsedDate = dayjs(date);
           if (!parsedDate.isValid()) {
-            throw new Error(`Invalid date format in row ${index + 2}. Expected format: YYYY-MM-DD`);
+            invalidRows.push(`Row ${index + 2}: Invalid date format`);
+            return;
           }
 
           // Validate category
-          const validCategories = categories.map(c => c.value.toLowerCase());
-          if (!category || !validCategories.includes(category.toString().toLowerCase())) {
-            throw new Error(`Invalid category "${category}" in row ${index + 2}. Valid categories are: ${validCategories.slice(1).join(', ')}`);
+          const validCategory = validateAndFormatCategory(category);
+          if (!validCategory) {
+            invalidRows.push(`Row ${index + 2}: Invalid category "${category}"`);
+            return;
           }
 
           // Validate status
           const validStatuses = ['success', 'failed'];
-          if (!status || !validStatuses.includes(status.toString().toLowerCase())) {
-            throw new Error(`Invalid status "${status}" in row ${index + 2}. Status must be either "success" or "failed"`);
+          const formattedStatus = status?.toString().toLowerCase();
+          if (!formattedStatus || !validStatuses.includes(formattedStatus)) {
+            invalidRows.push(`Row ${index + 2}: Invalid status "${status}"`);
+            return;
           }
 
-          return {
+          // Add valid row to transformed data
+          transformedData.push({
             key: index,
             date: parsedDate.format('YYYY-MM-DD'),
-            category: category.toString().toLowerCase(),
-            status: status.toString().toLowerCase(),
+            category: validCategory,
+            status: formattedStatus,
             responseTime: parseFloat(responseTime) || 0
-          };
+          });
         });
 
+        // Update categories list with new valid categories
+        updateCategoriesList(transformedData);
+
+        // Set the transformed data
         setData(transformedData);
         setFilteredData(transformedData);
         setIsFileUploaded(true);
         setUploadedFileName(file.name);
-        message.success(`Successfully uploaded ${transformedData.length} records from ${file.name}`);
+
+        // Show success message with warnings if any
+        if (invalidRows.length > 0) {
+          message.warning(
+            `File uploaded with ${invalidRows.length} invalid rows:\n${invalidRows.join('\n')}\n\n` +
+            `Successfully processed ${transformedData.length} valid records.`
+          );
+        } else {
+          message.success(`Successfully uploaded ${transformedData.length} records from ${file.name}`);
+        }
 
       } catch (error) {
         console.error('File processing error:', error);
