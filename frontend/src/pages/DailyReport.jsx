@@ -494,7 +494,7 @@ const DailyReport = () => {
               className="select-bold"
               style={{ 
                 width: '280px',
-                background: 'linear-gradient(to right, #f0f0f0, #ffffff)'
+                background: 'linear-gradient(to right, #d0d0d0, #ffffff)'
               }}
               value={selectedCategory}
               onChange={(value) => {
@@ -513,14 +513,14 @@ const DailyReport = () => {
               format="YYYY-MM-DD"
               style={{ 
                 width: '340px',
-                background: 'linear-gradient(to right, #f0f0f0, #ffffff)'
+                background: 'linear-gradient(to right, #d0d0d0, #ffffff)'
               }}
             />
             <Button
               type="primary"
               onClick={handleApplyFilters}
               style={{
-                background: 'linear-gradient(to right, #f0f0f0, #ffffff)',
+                background: 'linear-gradient(to right, #d0d0d0, #ffffff)',
                 color: '#000000',
                 minWidth: '120px',
                 border: '1px solid #d9d9d9'
@@ -533,7 +533,7 @@ const DailyReport = () => {
 
         <Row gutter={16} className="mb-6">
           <Col span={6}>
-            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #e0e0e0, #ffffff)' }}>
+            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #b0b0b0, #ffffff)' }}>
               <Statistic
                 title="Total Requests"
                 value={currentMetrics.totalRequests}
@@ -543,7 +543,7 @@ const DailyReport = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #e0e0e0, #ffffff)' }}>
+            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #b0b0b0, #ffffff)' }}>
               <Statistic
                 title="Success Rate"
                 value={currentMetrics.successRate}
@@ -554,7 +554,7 @@ const DailyReport = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #e0e0e0, #ffffff)' }}>
+            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #b0b0b0, #ffffff)' }}>
               <Statistic
                 title="Avg Response Time"
                 value={currentMetrics.avgResponseTime}
@@ -565,7 +565,7 @@ const DailyReport = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #e0e0e0, #ffffff)' }}>
+            <Card className="metrics-card" style={{ background: 'linear-gradient(to right, #b0b0b0, #ffffff)' }}>
               <Statistic
                 title="Failed Requests"
                 value={currentMetrics.failedRequests}
