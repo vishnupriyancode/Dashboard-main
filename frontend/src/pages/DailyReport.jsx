@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Card, DatePicker, Select, Table, Statistic, Row, Col, Upload, message, Button, Spin } from 'antd';
+import { Card, DatePicker, Select, Table, Statistic, Row, Col, Upload, message, Button, Spin, Switch } from 'antd';
 import { UploadOutlined, ArrowUpOutlined, ArrowDownOutlined, CheckCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
 import { fetchDataA } from '../services/api';
 import './DailyReport.css';
+
+const API_BASE_URL = 'http://localhost:5001/api';
 
 const { RangePicker } = DatePicker;
 
@@ -39,6 +41,8 @@ const DailyReport = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [postgresData, setPostgresData] = useState([]);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [selectedDataType, setSelectedDataType] = useState(null);
 
   const createColumnsFromHeaders = (headers) => {
     return headers.map((header) => {
@@ -453,10 +457,15 @@ const DailyReport = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchDataA();
-      const formattedData = data.map(item => ({
+      const response = await fetch(`${API_BASE_URL}/fetch-data-a`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch data');
+      }
+      const jsonData = await response.json();
+      const formattedData = jsonData.data.map(item => ({
         ...item,
         key: item.id,
+        timestamp: new Date(item.timestamp).toLocaleString(),
       }));
       setPostgresData(formattedData);
     } catch (err) {
@@ -465,6 +474,28 @@ const DailyReport = () => {
       setIsLoading(false);
     }
   };
+
+  // Add useEffect to fetch data initially when component mounts
+  useEffect(() => {
+    if (selectedDataType === 'data-a') {
+      handleFetchDataA();
+    }
+  }, [selectedDataType]);
+
+  // Add auto-refresh effect
+  useEffect(() => {
+    let intervalId;
+    if (autoRefresh && selectedDataType === 'data-a') {
+      intervalId = setInterval(() => {
+        handleFetchDataA();
+      }, 5000); // Refresh every 5 seconds
+    }
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [autoRefresh, selectedDataType]);
 
   const postgresColumns = [
     {
@@ -486,6 +517,7 @@ const DailyReport = () => {
       title: 'Timestamp',
       dataIndex: 'timestamp',
       key: 'timestamp',
+      sorter: (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
     },
     {
       title: 'Status',
@@ -501,6 +533,14 @@ const DailyReport = () => {
       ),
     },
   ];
+
+  // Modify the Select onChange handler
+  const handleDataTypeChange = (value) => {
+    setSelectedDataType(value);
+    if (value === 'data-a') {
+      handleFetchDataA();
+    }
+  };
 
   return (
     <div className="daily-report-container">
@@ -680,17 +720,30 @@ const DailyReport = () => {
       </Card>
 
       <Card className="data-section">
-        <Select
-          style={{ width: 200, marginBottom: 16 }}
-          placeholder="Pick Category"
-          onChange={(value) => {
-            if (value === 'data-a') {
-              handleFetchDataA();
-            }
-          }}
-        >
-          <Select.Option value="data-a">Fetching_sample</Select.Option>
-        </Select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+          <Select
+            style={{ width: 200 }}
+            placeholder="Pick Category"
+            value={selectedDataType}
+            onChange={handleDataTypeChange}
+          >
+            <Select.Option value="data-a">Fetching_sample</Select.Option>
+          </Select>
+          <Button 
+            onClick={handleFetchDataA}
+            loading={isLoading}
+          >
+            Refresh Data
+          </Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Switch
+              checked={autoRefresh}
+              onChange={(checked) => setAutoRefresh(checked)}
+              disabled={selectedDataType !== 'data-a'}
+            />
+            <span>Auto-refresh</span>
+          </div>
+        </div>
 
         {error && <div className="error-message">{error}</div>}
         

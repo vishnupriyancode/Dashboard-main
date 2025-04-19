@@ -16,8 +16,14 @@ app.use(express.static(path.join(__dirname, '../frontend/build')));
 // API Routes
 app.get('/api/fetch-data-a', async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM sample_data');
-    res.json(result.rows);
+    console.log('Fetching data from database...');
+    const result = await db.query('SELECT * FROM sample_data ORDER BY timestamp DESC');
+    console.log('Query result:', result);
+    if (!result || result.length === 0) {
+      console.log('No data found in database');
+      return res.json({ data: [] });
+    }
+    res.json({ data: result });
   } catch (error) {
     console.error('Error fetching data:', error);
     res.status(500).json({ error: 'Failed to fetch data' });
