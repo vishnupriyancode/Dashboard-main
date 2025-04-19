@@ -9,50 +9,79 @@ import { saveAs } from 'file-saver';
 const ApiLogsTable = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [methodFilter, setMethodFilter] = useState('all');
   const [logs, setLogs] = useState([]);
   const [selectedLogs, setSelectedLogs] = useState([]);
+  const [notification, setNotification] = useState(null);
+
+  // Function to load logs
+  const loadLogs = () => {
+    try {
+      const storedLogs = JSON.parse(localStorage.getItem('apiLogs') || '[]');
+      setLogs(storedLogs.length > 0 ? storedLogs : sampleApiLogs);
+    } catch (error) {
+      console.error('Error loading logs:', error);
+      setLogs(sampleApiLogs);
+    }
+  };
 
   useEffect(() => {
-    // Load logs from localStorage
-    const loadLogs = () => {
-      const storedLogs = JSON.parse(localStorage.getItem('apiLogs') || '[]');
-      console.log('Stored logs:', storedLogs);
-      console.log('Sample logs:', sampleApiLogs);
-      // Use stored logs if available, otherwise use sample data
-      setLogs(storedLogs.length > 0 ? storedLogs : sampleApiLogs);
-    };
-
     // Load initial logs
     loadLogs();
 
-    // Set up event listener for storage changes
-    window.addEventListener('storage', loadLogs);
+    // Set up event listeners for both storage and custom events
+    const handleStorageChange = (event) => {
+      if (event.key === 'apiLogs' || event.type === 'storage') {
+        loadLogs();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('apiLogUpdated', handleStorageChange);
 
     // Cleanup
     return () => {
-      window.removeEventListener('storage', loadLogs);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('apiLogUpdated', handleStorageChange);
     };
   }, []);
 
+  const showNotification = (message, type = 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
   const deleteLog = (logId) => {
-    // Remove from state
-    const updatedLogs = logs.filter(log => log.id !== logId);
-    setLogs(updatedLogs);
-    
-    // Update localStorage
-    localStorage.setItem('apiLogs', JSON.stringify(updatedLogs));
+    try {
+      // Remove from state
+      const updatedLogs = logs.filter(log => log.id !== logId);
+      setLogs(updatedLogs);
+      
+      // Update localStorage
+      localStorage.setItem('apiLogs', JSON.stringify(updatedLogs));
+      showNotification('Log deleted successfully', 'success');
+    } catch (error) {
+      console.error('Error deleting log:', error);
+      showNotification('Error deleting log', 'error');
+    }
   };
 
   const handleBulkDelete = () => {
     if (selectedLogs.length === 0) return;
     
-    // Remove selected logs from state
-    const updatedLogs = logs.filter(log => !selectedLogs.includes(log.id));
-    setLogs(updatedLogs);
-    setSelectedLogs([]);
-    
-    // Update localStorage
-    localStorage.setItem('apiLogs', JSON.stringify(updatedLogs));
+    try {
+      // Remove selected logs from state
+      const updatedLogs = logs.filter(log => !selectedLogs.includes(log.id));
+      setLogs(updatedLogs);
+      setSelectedLogs([]);
+      
+      // Update localStorage
+      localStorage.setItem('apiLogs', JSON.stringify(updatedLogs));
+      showNotification(`${selectedLogs.length} logs deleted successfully`, 'success');
+    } catch (error) {
+      console.error('Error deleting logs:', error);
+      showNotification('Error deleting logs', 'error');
+    }
   };
 
   const toggleSelectAll = (checked) => {
@@ -71,13 +100,20 @@ const ApiLogsTable = () => {
     );
   };
 
-  const copyToClipboard = (value) => {
-    const jsonPayload = payloadData[value];
-    if (jsonPayload) {
-      navigator.clipboard.writeText(JSON.stringify(jsonPayload, null, 2));
-    } else {
-      // Fallback to copying just the key if no JSON payload exists
-      navigator.clipboard.writeText(value);
+  const copyToClipboard = async (value) => {
+    try {
+      const jsonPayload = payloadData[value];
+      if (jsonPayload) {
+        await navigator.clipboard.writeText(JSON.stringify(jsonPayload, null, 2));
+        showNotification('JSON copied to clipboard', 'success');
+      } else {
+        // Fallback to copying just the key if no JSON payload exists
+        await navigator.clipboard.writeText(value);
+        showNotification('Value copied to clipboard', 'success');
+      }
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      showNotification('Error copying to clipboard', 'error');
     }
   };
 
@@ -85,44 +121,82 @@ const ApiLogsTable = () => {
     const searchTermLower = searchTerm.toLowerCase();
     const computedState = log.status === 'success' ? 'Completed' : log.status === 'error' ? 'Failed' : 'In Progress';
     
-    // Special handling for POST/GET search
-    if (searchTermLower === 'post' || searchTermLower === 'get') {
-      return (log.method || '').toLowerCase() === searchTermLower;
-    }
-    
     const matchesSearch = 
       (log.endpoint || '').toLowerCase().includes(searchTermLower) ||
       (log.domain_id?.toString() || '').toLowerCase().includes(searchTermLower) ||
       (log.model || '').toLowerCase().includes(searchTermLower) ||
       (log.status || '').toLowerCase().includes(searchTermLower) ||
       (log.value?.toString() || '').toLowerCase().includes(searchTermLower) ||
+      (log.request_id || '').toLowerCase().includes(searchTermLower) ||
       computedState.toLowerCase().includes(searchTermLower);
+    
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesMethod = methodFilter === 'all' || log.method === methodFilter;
+    
+    return matchesSearch && matchesStatus && matchesMethod;
   }).slice(0, 1000); // Limit to 1000 records
 
   const handleExport = () => {
-    const exportData = filteredLogs.map(log => ({
-      'Domain ID': log.domain_id,
-      'Model': log.model,
-      'Status': log.status,
-      'Endpoint': log.endpoint,
-      'Time': log.time,
-      'State': log.status === 'success' ? 'Completed' : log.status === 'error' ? 'Failed' : 'In Progress',
-      'Value': log.value
-    }));
+    try {
+      const exportData = filteredLogs.map(log => ({
+        'Domain ID': log.domain_id,
+        'Model': log.model,
+        'Method': log.method,
+        'Status': log.status,
+        'Endpoint': log.endpoint,
+        'Time': log.time,
+        'State': log.status === 'success' ? 'Completed' : log.status === 'error' ? 'Failed' : 'In Progress',
+        'Value': log.value,
+        'Request ID': log.request_id || ''
+      }));
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'API Logs');
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(data, 'api_logs.xlsx');
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'API Logs');
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(data, 'api_logs.xlsx');
+      showNotification('Export successful', 'success');
+    } catch (error) {
+      console.error('Error exporting logs:', error);
+      showNotification('Error exporting logs', 'error');
+    }
   };
 
   return (
     <div className="flex flex-col">
-      <h1 className="text-2xl font-bold mb-6">API Records</h1>
+      {notification && (
+        <div className={`mb-4 p-4 rounded-md ${
+          notification.type === 'success' ? 'bg-green-50 text-green-800' :
+          notification.type === 'error' ? 'bg-red-50 text-red-800' :
+          'bg-blue-50 text-blue-800'
+        }`}>
+          {notification.message}
+        </div>
+      )}
+      
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">API Records</h1>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 rounded-md bg-gray-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600 transition-colors duration-200"
+          >
+            <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
+            Export to Excel
+          </button>
+          {selectedLogs.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 transition-colors duration-200"
+            >
+              <TrashIcon className="h-5 w-5" aria-hidden="true" />
+              Delete Selected ({selectedLogs.length})
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="mb-4 flex items-center space-x-4">
         <div className="relative w-64">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -131,27 +205,22 @@ const ApiLogsTable = () => {
           <input
             type="text"
             className="block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            placeholder="Search endpoints..."
+            placeholder="Search records..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button
-          onClick={handleExport}
-          className="inline-flex items-center gap-2 rounded-md bg-gray-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600 transition-colors duration-200"
+        
+        <select
+          className="rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+          value={methodFilter}
+          onChange={(e) => setMethodFilter(e.target.value)}
         >
-          <DocumentArrowDownIcon className="h-5 w-5" aria-hidden="true" />
-          Export to Excel
-        </button>
-        {selectedLogs.length > 0 && (
-          <button
-            onClick={handleBulkDelete}
-            className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 transition-colors duration-200"
-          >
-            <TrashIcon className="h-5 w-5" aria-hidden="true" />
-            Delete Selected ({selectedLogs.length})
-          </button>
-        )}
+          <option value="all">All Methods</option>
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+        </select>
+
         <select
           className="rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
           value={statusFilter}
@@ -160,7 +229,7 @@ const ApiLogsTable = () => {
           <option value="all">All Status</option>
           <option value="success">Success</option>
           <option value="error">Failed</option>
-          <option value="pending">pending</option>
+          <option value="pending">Pending</option>
         </select>
       </div>
 
@@ -198,7 +267,7 @@ const ApiLogsTable = () => {
                 State
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Reqested Id
+                Request ID
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Actions
@@ -250,13 +319,13 @@ const ApiLogsTable = () => {
                   {log.endpoint}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                  {log.time}
+                  {new Date(log.time).toLocaleString()}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                   {log.status === 'success' ? 'Completed' : log.status === 'error' ? 'Failed' : 'In Progress'}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-sm font-mono bg-gray-50 rounded">
-                  {log.value}
+                  {log.request_id || log.value}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                   <Menu as="div" className="relative inline-block text-left">

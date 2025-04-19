@@ -454,16 +454,24 @@ const DailyReport = () => {
     setError(null);
     try {
       const data = await fetchDataA();
-      setPostgresData(data);
+      const formattedData = data.map(item => ({
+        ...item,
+        key: item.id,
+      }));
+      setPostgresData(formattedData);
     } catch (err) {
-      setError('Failed to fetch data from the database');
-      message.error('Failed to fetch data from the database');
+      setError('Failed to fetch data: ' + err.message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const postgresColumns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+    },
     {
       title: 'Name',
       dataIndex: 'name',
@@ -483,6 +491,14 @@ const DailyReport = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
+      render: (status) => (
+        <span style={{ 
+          color: status === 'active' ? '#52c41a' : 
+                 status === 'inactive' ? '#f5222d' : '#faad14'
+        }}>
+          {status}
+        </span>
+      ),
     },
   ];
 
@@ -668,15 +684,12 @@ const DailyReport = () => {
           style={{ width: 200, marginBottom: 16 }}
           placeholder="Pick Category"
           onChange={(value) => {
-            if (value === 'data-a',
-                value === 'data-b'
-            ) {
+            if (value === 'data-a') {
               handleFetchDataA();
             }
           }}
         >
-          <Select.Option value="data-a">Fetch Data A</Select.Option>
-          <Select.Option value="data-b">Fetch Data B</Select.Option>
+          <Select.Option value="data-a">Fetching_sample</Select.Option>
         </Select>
 
         {error && <div className="error-message">{error}</div>}

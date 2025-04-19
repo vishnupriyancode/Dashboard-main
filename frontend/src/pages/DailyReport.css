@@ -1,14 +1,25 @@
 .daily-report-container {
   padding: 24px;
-  background: linear-gradient(135deg, #e6e6e6 0%, #ffffff 100%);
+  background: #f7f7f7;
   min-height: 100vh;
 }
 
 .daily-report-card {
   margin-bottom: 24px;
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.daily-report-card .ant-card-head {
+  padding: 16px 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.daily-report-card .ant-card-head-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
 }
 
 .controls-section {
@@ -17,6 +28,7 @@
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+  padding: 0 12px;
 }
 
 .upload-section {
@@ -35,14 +47,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  font-weight: 500;
 }
 
 .upload-section .ant-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .filters-section {
@@ -53,36 +66,40 @@
 
 .metrics-card {
   height: 100%;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  transition: all 0.3s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  background: white;
 }
 
 .metrics-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.08);
 }
 
 .metrics-card .ant-card-body {
-  padding: 20px;
+  padding: 24px;
 }
 
 .metrics-card .ant-statistic-title {
-  font-size: 16px;
-  color: rgba(0, 0, 0, 0.65);
-  margin-bottom: 12px;
+  font-size: 14px;
+  color: #6B7280;
+  margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .metrics-card .ant-statistic-content {
   font-size: 28px;
-  font-weight: 600;
+  font-weight: 700;
+  color: #111827;
 }
 
 .metrics-card .ant-statistic-content-suffix,
 .metrics-card .ant-statistic-content-prefix {
   font-size: 20px;
   margin: 0 4px;
+  font-weight: 600;
 }
 
 .comparison-value {
@@ -91,38 +108,40 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  font-weight: 500;
 }
 
 .table-container {
   margin-top: 24px;
+  padding: 0 12px;
 }
 
 /* Ant Design component overrides */
 .select-bold .ant-select-selection-placeholder,
 .select-bold .ant-select-selection-item {
-  color: rgba(0, 0, 0, 0.88);
+  color: #111827;
   font-weight: 500;
 }
 
 .select-bold .ant-select-selector {
-  border-radius: 6px !important;
-  border: 1px solid #d9d9d9 !important;
-  padding: 4px 11px !important;
+  border-radius: 8px !important;
+  border: 1px solid #E5E7EB !important;
+  padding: 4px 12px !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-  background: linear-gradient(to bottom, #ffffff, #f0f0f0) !important;
+  background: white !important;
 }
 
 .date-picker-bold .ant-picker-input > input::placeholder,
 .date-picker-bold .ant-picker-input > input {
-  color: rgba(0, 0, 0, 0.88);
+  color: #111827;
   font-weight: 500;
 }
 
 .date-picker-bold {
-  border-radius: 6px !important;
-  border: 1px solid #d9d9d9 !important;
+  border-radius: 8px !important;
+  border: 1px solid #E5E7EB !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-  background: linear-gradient(to bottom, #ffffff, #f0f0f0) !important;
+  background: white !important;
 }
 
 .select-bold .ant-select-selector:hover,
@@ -131,29 +150,35 @@
 }
 
 .ant-table {
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
 .ant-table-thead > tr > th {
-  background: #fafafa !important;
+  background: #F9FAFB !important;
   font-weight: 600;
-}
-
-.ant-statistic-title {
-  color: rgba(0, 0, 0, 0.45);
+  color: #374151;
   font-size: 14px;
-  margin-bottom: 8px;
 }
 
-.ant-statistic-content {
-  color: rgba(0, 0, 0, 0.88);
-  font-size: 24px;
-  font-weight: 600;
+.ant-table-tbody > tr > td {
+  font-size: 14px;
+  color: #111827;
 }
 
 .data-section {
   margin-top: 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+}
+
+.data-section .ant-card-head-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
 }
 
 .loading-container {
@@ -164,10 +189,11 @@
 }
 
 .error-message {
-  color: #ff4d4f;
+  color: #DC2626;
   margin-bottom: 16px;
-  padding: 8px;
-  background-color: #fff2f0;
-  border: 1px solid #ffccc7;
-  border-radius: 4px;
+  padding: 12px;
+  background-color: #FEF2F2;
+  border: 1px solid #FCA5A5;
+  border-radius: 8px;
+  font-weight: 500;
 } 

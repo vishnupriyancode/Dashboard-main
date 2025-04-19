@@ -13,30 +13,28 @@ const db = new sqlite3.Database(dbPath, (err) => {
   
   // Insert sample data
   const sampleData = [
-    ['API Request 1', '200ms', 'success'],
-    ['API Request 2', '150ms', 'success'],
-    ['API Request 3', '500ms', 'failed'],
-    ['API Request 4', '300ms', 'success'],
-    ['API Request 5', '450ms', 'pending']
+    ['Sample Data 1', 'Test Value 1', '2024-04-07 10:00:00', 'active'],
+    ['Sample Data 2', 'Test Value 2', '2024-04-07 11:00:00', 'inactive'],
+    ['Sample Data 3', 'Test Value 3', '2024-04-07 12:00:00', 'active']
   ];
   
   db.serialize(() => {
-    // Create table
+    // Create table with updated schema
     db.run(`
       CREATE TABLE IF NOT EXISTS sample_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        value TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        status TEXT
+        name CHARACTER VARYING(255) NOT NULL,
+        value CHARACTER VARYING(255),
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status CHARACTER VARYING(50)
       )
     `);
     
     // Clear existing data
     db.run('DELETE FROM sample_data');
     
-    // Insert new data
-    const stmt = db.prepare('INSERT INTO sample_data (name, value, status) VALUES (?, ?, ?)');
+    // Insert new data with timestamp
+    const stmt = db.prepare('INSERT INTO sample_data (name, value, timestamp, status) VALUES (?, ?, ?, ?)');
     sampleData.forEach(row => {
       stmt.run(row);
     });

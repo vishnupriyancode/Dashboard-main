@@ -16,4 +16,4 @@ export const fetchDataA = async () => {
     console.error('Error fetching data:', error);
     throw error;
   }
-}; 
+};
