@@ -3,17 +3,15 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   ChartBarIcon,
   DocumentTextIcon,
-  UserGroupIcon,
-  Cog6ToothIcon,
+  ClipboardDocumentListIcon,
   ChartPieIcon,
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: ChartBarIcon },
   { name: 'Daily Report', href: '/daily-report', icon: ChartPieIcon },
-  { name: 'API Logs', href: '/logs', icon: DocumentTextIcon },
-  { name: 'Request', href: '/request', icon: UserGroupIcon },
-  { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
+  { name: 'API Logs', href: '/apilogs', icon: DocumentTextIcon },
+  { name: 'Request', href: '/request', icon: ClipboardDocumentListIcon },
 ];
 
 const Sidebar = () => {

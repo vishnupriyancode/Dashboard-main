@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import sampleData from '../data/sampleData.json';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import ValidateRequest from './ValidateRequest';
 
 // Custom toast styles
 const toastStyles = {
@@ -168,6 +167,11 @@ const RequestPage = () => {
     showNotification(status === 'success' ? 'success' : 'error', method, requestId);
   };
 
+  const handleKeyChange = (e) => {
+    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 13);
+    setKeyValue(value);
+  };
+
   const handleValidateSubmit = async (method, key) => {
     setKeyValue(key); // We'll keep this for UI state
     // Instead of calling handleSubmit, we'll implement the logic directly here
@@ -256,7 +260,62 @@ const RequestPage = () => {
 
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="lg:w-1/2">
-          <ValidateRequest onSubmit={handleValidateSubmit} isLoading={loading} />
+          <div className="bg-white shadow rounded-lg p-6 w-full">
+            <form className="relative">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-gray-500 to-gray-700"></div>
+              <h2 className="text-xl font-bold text-gray-800 mb-6">Validate Request</h2>
+              
+              <div className="mb-6">
+                <label htmlFor="key" className="block text-sm font-semibold text-gray-700 mb-2">
+                  13-Digit Key
+                </label>
+                <input
+                  type="text"
+                  id="key"
+                  value={keyValue}
+                  onChange={handleKeyChange}
+                  placeholder="Enter 13-digit key"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  maxLength={13}
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleValidateSubmit('GET', keyValue)}
+                  disabled={keyValue.length !== 13 || loading}
+                  className="flex-1 bg-gradient-to-r from-gray-500 to-gray-700 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:transform hover:-translate-y-0.5 transition-transform"
+                >
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin mr-2"></div>
+                      Processing...
+                    </div>
+                  ) : (
+                    'GET'
+                  )}
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => handleValidateSubmit('POST', keyValue)}
+                  disabled={keyValue.length !== 13 || loading}
+                  className="flex-1 bg-gradient-to-r from-gray-700 to-gray-900 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:transform hover:-translate-y-0.5 transition-transform"
+                >
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin mr-2"></div>
+                      Processing...
+                    </div>
+                  ) : (
+                    'POST'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
 
         <div className="lg:w-1/2">

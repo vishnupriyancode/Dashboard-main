@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Card, DatePicker, Select, Table, Statistic, Row, Col, Upload, message, Button } from 'antd';
+import { Card, DatePicker, Select, Table, Statistic, Row, Col, Upload, message, Button, Spin } from 'antd';
 import { UploadOutlined, ArrowUpOutlined, ArrowDownOutlined, CheckCircleOutlined, DeleteOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import dayjs from 'dayjs';
+import { fetchDataA } from '../services/api';
 import './DailyReport.css';
 
 const { RangePicker } = DatePicker;
@@ -35,6 +36,9 @@ const DailyReport = () => {
     status: ['status', 'state', 'condition', 'result'],
     responseTime: ['responsetime', 'response', 'response_time', 'responseduration', 'duration', 'time']
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [postgresData, setPostgresData] = useState([]);
 
   const createColumnsFromHeaders = (headers) => {
     return headers.map((header) => {
@@ -445,6 +449,43 @@ const DailyReport = () => {
     );
   };
 
+  const handleFetchDataA = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchDataA();
+      setPostgresData(data);
+    } catch (err) {
+      setError('Failed to fetch data from the database');
+      message.error('Failed to fetch data from the database');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const postgresColumns = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: 'Value',
+      dataIndex: 'value',
+      key: 'value',
+    },
+    {
+      title: 'Timestamp',
+      dataIndex: 'timestamp',
+      key: 'timestamp',
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+    },
+  ];
+
   return (
     <div className="daily-report-container">
       <Card title="Daily Report" className="daily-report-card">
@@ -620,6 +661,40 @@ const DailyReport = () => {
             scroll={{ x: true }}
           />
         </div>
+      </Card>
+
+      <Card className="data-section">
+        <Select
+          style={{ width: 200, marginBottom: 16 }}
+          placeholder="Pick Category"
+          onChange={(value) => {
+            if (value === 'data-a',
+                value === 'data-b'
+            ) {
+              handleFetchDataA();
+            }
+          }}
+        >
+          <Select.Option value="data-a">Fetch Data A</Select.Option>
+          <Select.Option value="data-b">Fetch Data B</Select.Option>
+        </Select>
+
+        {error && <div className="error-message">{error}</div>}
+        
+        {isLoading ? (
+          <div className="loading-container">
+            <Spin size="large" />
+          </div>
+        ) : (
+          postgresData.length > 0 && (
+            <Table
+              columns={postgresColumns}
+              dataSource={postgresData}
+              rowKey="id"
+              pagination={{ pageSize: 10 }}
+            />
+          )
+        )}
       </Card>
     </div>
   );

@@ -40,7 +40,7 @@ const App = () => {
           }
         />
         <Route
-          path="/logs"
+          path="/apilogs"
           element={
             <ProtectedRoute>
               <DashboardLayout>

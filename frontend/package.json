@@ -1,35 +1,50 @@
 {
-  "name": "api-dashboard",
+  "name": "dashboard-frontend",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
   "dependencies": {
-    "@headlessui/react": "^1.7.17",
-    "@heroicons/react": "^2.1.1",
-    "@types/react-datepicker": "^6.2.0",
-    "antd": "^5.24.6",
-    "chart.js": "^4.4.8",
-    "date-fns": "^4.1.0",
-    "dayjs": "^1.11.13",
+    "@ant-design/icons": "^4.8.0",
+    "@headlessui/react": "^2.2.2",
+    "@heroicons/react": "^2.2.0",
+    "@types/file-saver": "^2.0.7",
+    "antd": "^5.0.0",
+    "chart.js": "^4.4.9",
+    "cross-env": "^7.0.3",
     "file-saver": "^2.0.5",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.3.0",
-    "react-datepicker": "^8.2.1",
+    "react-datepicker": "^8.3.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.22.1",
+    "react-router-dom": "^6.30.0",
+    "react-scripts": "5.0.1",
     "react-toastify": "^11.0.5",
+    "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
   },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.17",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
-    "vite": "^5.1.0"
-  }
+  "scripts": {
+    "start": "cross-env PORT=3000 react-scripts start",
+    "dev": "cross-env PORT=3000 react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "proxy": "http://localhost:5001"
 }
