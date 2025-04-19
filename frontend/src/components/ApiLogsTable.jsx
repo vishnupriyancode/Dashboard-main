@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { MagnifyingGlassIcon, EllipsisVerticalIcon, DocumentArrowDownIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Menu } from '@headlessui/react';
 import { payloadData } from '../data/payloadData';
-import { sampleApiLogs } from '../data/sampleApiLogs';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
@@ -14,14 +13,18 @@ const ApiLogsTable = () => {
   const [selectedLogs, setSelectedLogs] = useState([]);
   const [notification, setNotification] = useState(null);
 
-  // Function to load logs
-  const loadLogs = () => {
+  // Function to load logs from API
+  const loadLogs = async () => {
     try {
-      const storedLogs = JSON.parse(localStorage.getItem('apiLogs') || '[]');
-      setLogs(storedLogs.length > 0 ? storedLogs : sampleApiLogs);
+      const response = await fetch('http://localhost:5001/api/fetch-data-a');
+      if (!response.ok) {
+        throw new Error('Failed to fetch logs');
+      }
+      const data = await response.json();
+      setLogs(data.data || []);
     } catch (error) {
       console.error('Error loading logs:', error);
-      setLogs(sampleApiLogs);
+      setNotification({ message: 'Failed to load logs', type: 'error' });
     }
   };
 

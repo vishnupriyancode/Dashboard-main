@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import { fetchDataA } from '../services/api';
 import './DailyReport.css';
 
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 const { RangePicker } = DatePicker;
 
@@ -457,38 +457,41 @@ const DailyReport = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/fetch-data-a`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch data');
+      const response = await fetchDataA();
+      
+      if (!response || !response.data || !Array.isArray(response.data)) {
+        throw new Error('Invalid data format received from server');
       }
-      const jsonData = await response.json();
-      const formattedData = jsonData.data.map(item => ({
+
+      const formattedData = response.data.map(item => ({
         ...item,
         key: item.id,
         timestamp: new Date(item.timestamp).toLocaleString(),
       }));
+      
       setPostgresData(formattedData);
+      message.success('Data fetched successfully');
     } catch (err) {
-      setError('Failed to fetch data: ' + err.message);
+      console.error('Data fetch error:', err);
+      setError(`Failed to fetch data: ${err.message}`);
+      message.error(`Failed to fetch data: ${err.message}`);
+      setPostgresData([]); // Clear any previous data on error
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Add useEffect to fetch data initially when component mounts
-  useEffect(() => {
-    if (selectedDataType === 'data-a') {
-      handleFetchDataA();
-    }
-  }, [selectedDataType]);
-
-  // Add auto-refresh effect
+  // Update the auto-refresh effect with error handling
   useEffect(() => {
     let intervalId;
     if (autoRefresh && selectedDataType === 'data-a') {
       intervalId = setInterval(() => {
-        handleFetchDataA();
-      }, 5000); // Refresh every 5 seconds
+        handleFetchDataA().catch(err => {
+          console.error('Auto-refresh error:', err);
+          setAutoRefresh(false); // Disable auto-refresh on error
+          message.error('Auto-refresh disabled due to error');
+        });
+      }, 5000);
     }
     return () => {
       if (intervalId) {
@@ -720,7 +723,21 @@ const DailyReport = () => {
       </Card>
 
       <Card className="data-section">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+        <h2 style={{ 
+          fontSize: '24px',
+          fontWeight: 'bold',
+          marginBottom: '20px',
+          color: '#1a1a1a'
+        }}>
+          Fetch Records
+        </h2>
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '16px', 
+          marginBottom: '16px',
+          height: '32px'  // Match the height of controls
+        }}>
           <Select
             style={{ width: 200 }}
             placeholder="Pick Category"
@@ -732,6 +749,7 @@ const DailyReport = () => {
           <Button 
             onClick={handleFetchDataA}
             loading={isLoading}
+            style={{ height: '32px' }}  // Match height with Select
           >
             Refresh Data
           </Button>
@@ -757,7 +775,7 @@ const DailyReport = () => {
               columns={postgresColumns}
               dataSource={postgresData}
               rowKey="id"
-              pagination={{ pageSize: 10 }}
+              pagination={false}
             />
           )
         )}
