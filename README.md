@@ -1,25 +1,71 @@
-# Management Dashboard Web Application
+# Dashboard Project
 
-A modern management dashboard built with Angular and Node.js.
+This project consists of a full-stack application with a Node.js backend and a React frontend. Below is a detailed explanation of the project structure and setup instructions.
 
-## Features
+## Project Structure
 
-- Summary Cards displaying key metrics
-- Status Charts (Pie/Bar charts)
-- Timeline Charts for project progress
-- Response Tables with pagination and search
-- Chat Panel for team communication
-- Responsive design
+### Backend (`/backend`)
 
-## Prerequisites
+The backend is built with Node.js and includes the following key components:
 
-- Node.js (v16 or higher)
-- Angular CLI (for frontend development)
-- npm (Node Package Manager)
+- `index.js`: Main entry point for the backend application
+- `server.js`: Server configuration and setup
+- `routes/`: API route definitions
+- `models/`: Database models and schemas
+- `config/`: Configuration files
+- `prisma/`: Database schema and migrations
+- `scripts/`: Utility scripts
+- `data/`: Sample data and data management
+- `.env`: Environment variables
 
-## Setup
+### Frontend (`/frontend`)
+
+The frontend is built with React and includes:
+
+- `src/`: Source code directory
+- `public/`: Static assets
+- `vite.config.js`: Vite configuration
+- `tailwind.config.js`: Tailwind CSS configuration
+- `postcss.config.js`: PostCSS configuration
+- `index.html`: Main HTML file
+
+## Environment Setup
+
+### Prerequisites
+
+- Node.js (v14 or higher)
+- npm or yarn
+- Python 3.8+ (for data generation scripts)
+- PostgreSQL (for database)
+
+### Backend Setup
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   - Copy `.env.example` to `.env`
+   - Update the variables with your configuration
+
+4. Initialize the database:
+   ```bash
+   npx prisma migrate dev
+   ```
+
+5. Start the backend server:
+   ```bash
+   npm start
+   ```
 
 ### Frontend Setup
+
 1. Navigate to the frontend directory:
    ```bash
    cd frontend
@@ -32,63 +78,42 @@ A modern management dashboard built with Angular and Node.js.
 
 3. Start the development server:
    ```bash
-   ng serve
+   npm run dev
    ```
 
-### Backend Setup
-1. Open a new terminal and navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
+## Development Workflow
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+1. The backend runs on `http://localhost:3000` by default
+2. The frontend runs on `http://localhost:5173` by default
+3. API endpoints are prefixed with `/api`
+4. The frontend communicates with the backend through these API endpoints
 
-3. Start the server:
-   ```bash
-   npm start
-   ```
+## Data Generation
 
-## Accessing the Application
+The project includes a Python script for generating sample data:
 
-- Frontend: http://localhost:4200
-- Backend API: http://localhost:3000
-
-## Project Structure
-
-```
-.
-├── frontend/              # Angular frontend application
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── dashboard/    # Dashboard components
-│   │   │   └── services/     # API services
-│   │   └── ...
-│   └── ...
-└── backend/               # Node.js backend application
-    ├── src/
-    │   ├── routes/       # API routes
-    │   └── ...
-    └── ...
+```bash
+python generate_sample_data.py
 ```
 
-## API Endpoints
+This will create sample data in the `api_responses.xlsx` file.
 
-- GET /api/metrics - Get dashboard metrics
-- GET /api/status - Get status data for charts
-- GET /api/timeline - Get timeline data
-- GET /api/table - Get table data
-- GET /api/chat - Get chat messages
+## Environment Variables
+
+### Backend (.env)
+- `DATABASE_URL`: PostgreSQL connection string
+- `PORT`: Server port (default: 3000)
+- `NODE_ENV`: Environment (development/production)
+
+### Frontend
+- `VITE_API_URL`: Backend API URL
+- `VITE_ENV`: Environment (development/production)
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a new Pull Request
+1. Create a new branch for your feature
+2. Make your changes
+3. Submit a pull request
 
 ## License
 
