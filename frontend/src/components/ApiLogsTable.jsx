@@ -16,15 +16,30 @@ const ApiLogsTable = () => {
   // Function to load logs from API
   const loadLogs = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/fetch-data-a');
+      // First try to fetch from backend API
+      const response = await fetch('http://localhost:5001/api/api-logs');
       if (!response.ok) {
-        throw new Error('Failed to fetch logs');
+        throw new Error('Failed to fetch logs from API');
       }
-      const data = await response.json();
-      setLogs(data.data || []);
+      const apiData = await response.json();
+      
+      if (apiData.success && apiData.data && apiData.data.length > 0) {
+        setLogs(apiData.data);
+      } else {
+        // If API doesn't return data, fall back to localStorage
+        const storedLogs = JSON.parse(localStorage.getItem('apiLogs') || '[]');
+        setLogs(storedLogs);
+      }
     } catch (error) {
-      console.error('Error loading logs:', error);
-      setNotification({ message: 'Failed to load logs', type: 'error' });
+      console.error('Error loading logs from API:', error);
+      // Fall back to localStorage if API fails
+      try {
+        const storedLogs = JSON.parse(localStorage.getItem('apiLogs') || '[]');
+        setLogs(storedLogs);
+      } catch (storageError) {
+        console.error('Error loading logs from localStorage:', storageError);
+        setNotification({ message: 'Failed to load logs', type: 'error' });
+      }
     }
   };
 
@@ -130,7 +145,6 @@ const ApiLogsTable = () => {
       (log.model || '').toLowerCase().includes(searchTermLower) ||
       (log.status || '').toLowerCase().includes(searchTermLower) ||
       (log.value?.toString() || '').toLowerCase().includes(searchTermLower) ||
-      (log.request_id || '').toLowerCase().includes(searchTermLower) ||
       computedState.toLowerCase().includes(searchTermLower);
     
     const matchesStatus = statusFilter === 'all' || log.status === statusFilter;
@@ -149,8 +163,7 @@ const ApiLogsTable = () => {
         'Endpoint': log.endpoint,
         'Time': log.time,
         'State': log.status === 'success' ? 'Completed' : log.status === 'error' ? 'Failed' : 'In Progress',
-        'Value': log.value,
-        'Request ID': log.request_id || ''
+        'Value': log.value
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -270,9 +283,6 @@ const ApiLogsTable = () => {
                 State
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Request ID
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Actions
               </th>
             </tr>
@@ -326,9 +336,6 @@ const ApiLogsTable = () => {
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
                   {log.status === 'success' ? 'Completed' : log.status === 'error' ? 'Failed' : 'In Progress'}
-                </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm font-mono bg-gray-50 rounded">
-                  {log.request_id || log.value}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                   <Menu as="div" className="relative inline-block text-left">

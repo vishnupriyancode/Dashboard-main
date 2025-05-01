@@ -154,13 +154,28 @@ const RequestPage = () => {
       request_id: `req_${key}_${Date.now()}`
     };
 
-    // Get existing logs from localStorage or initialize empty array
+    // Save to localStorage for immediate display
     const existingLogs = JSON.parse(localStorage.getItem('apiLogs') || '[]');
     existingLogs.unshift(log); // Add new log at the beginning
     localStorage.setItem('apiLogs', JSON.stringify(existingLogs));
     
-    // Force a refresh of the logs display
-    window.dispatchEvent(new Event('storage'));
+    // Also save to backend API
+    fetch('http://localhost:5001/api/save-api-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(log)
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('API log saved to backend:', data);
+      // Force a refresh of the logs display
+      window.dispatchEvent(new Event('storage'));
+    })
+    .catch(error => {
+      console.error('Error saving API log to backend:', error);
+      // Still dispatch the event to update UI with localStorage data
+      window.dispatchEvent(new Event('storage'));
+    });
 
     // Updated notification calls
     const requestId = `req_${key}_${Date.now()}`;
